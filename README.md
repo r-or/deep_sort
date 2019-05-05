@@ -1,4 +1,4 @@
-# Deep SORT
+# Deep SORT with openvino
 
 ## Introduction
 
@@ -22,7 +22,7 @@ Additionally, feature generation requires TensorFlow (>= 1.0).
 
 First, clone the repository:
 ```
-git clone https://github.com/nwojke/deep_sort.git
+git clone https://github.com/r-or/deep_sort.git
 ```
 Then, download pre-generated detections and the CNN checkpoint file from
 [here](https://drive.google.com/open?id=18fKzfqnqhqW3s9zwsCbnVJ5XF2JFeqMp).
@@ -90,8 +90,25 @@ try passing an absolute path to the ``--model`` argument. This might help in
 some cases.
 
 ### Notes on Openvino
-This branch adds support for Openvino. Obviously this is more useful for online
+This fork adds support for Openvino. Obviously this is more useful for online
 feature extraction instead of generating detections into a text file for MOT16.
+
+**Openvino installation:** if you are using an offcially not supported (newer) 
+version of Ubuntu, e.g. 19.04, the easiest way of installing openvino is just to 
+selectively the rpms inside ```<extracted framework>/rpm/``` to ```/``` after you ran through
+the normal installation procedure detailed at [openvino installation guide](https://docs.openvinotoolkit.org/latest/_docs_install_guides_installing_openvino_linux.html).
+Even if you run the semi-officially supported Ubuntu 18.04 you'll likely run into
+issues caused by missing libraries due to bugs in the installation script.
+    
+A shortcut to get things going: backup your original ```/etc/lsb-release``` and modify
+it so it looks like this:
+```
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=18.04
+DISTRIB_CODENAME=bionic
+DISTRIB_DESCRIPTION="Ubuntu 18.04"
+```
+After performing the installation the original file can be restored.
 
 **Performance estimation:** during the [AI hackathon](http://www.ai-hackathon.com/)
 we used this to generate embeddings from a video stream on a NCS2. It was able
@@ -99,20 +116,24 @@ to sustain around 5fps while tracking more than 15 targets. Note that no batch
 processing is available on this device, so for each target inference must be
 called sequentially.
 
-On CPU it runs roughly at the same speed as vanilla tensorflow. (Intel) GPU
-unfortunately doesn't work currently.
+On CPU it runs roughly at 
+[three times the speed as vanilla tensorflow](https://gist.github.com/r-or/e1b85c47e1906763b6e0e7a209812dda).
+(Intel) GPU unfortunately doesn't work currently.
+
+You can run ```python test_ov.py``` to test the installation and make a 
+performance comparison.
 
 For the feature extraction to use Openvino, a few additional steps have to be
 taken:
 
-##### 1) Freeze model for Openvino
+#### 1) Freeze model for Openvino
 This is necessary as the default model includes elements which are incompatible
 with Openvino:
 ```
 python tools/freeze_model.py --no_preprocess
 ```
 
-##### 2) Convert model with Model Optimizer
+#### 2) Convert model with Model Optimizer
 ```
 cd model_data/networks
 mo_tf.py --input_model mars-small128.pb -b 1 --data_type <data_type>
@@ -121,7 +142,7 @@ As data type you need to use a type which is supported for the device you want
 to use. The Movidius NCS2 compute stick for instance needs "FP16", the CPU only
 supports the default "FP32".
 
-##### 3) Generate detections
+#### 3) Generate detections
 To generate the MOT16 detections in addition you have to supply the Openvino
 device (e.g. "CPU" or "MYRIAD" for the NCS2):
 ```
@@ -131,6 +152,7 @@ python tools/generate_detections.py \
     --output_dir=./resources/detections/MOT16_train \
     --use_openvino=MYRIAD
 ```
+
 
 ## Training the model
 
